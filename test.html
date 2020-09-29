@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AAAA</title>
+</head>
+<body onload="onLoad();">
+<audio src="bullet.mp3" controls="visible" autoplay="true" loop="loop" preload="preload">
+    Your browser does not support the audio element.
+</audio>
+<audio src="boom.mp3" controls="aaa">
+    Your browser does not support the audio element.
+</audio>
+
+<audio id="myAudio" src="bgm.mp3" controls="aaa" volume="0.1">
+    Your browser does not support the audio element.
+</audio>
+
+<button onclick="showAttr();">显示属性</button>
+<p id="audioattr"></p>
+<script>
+    function showAttr(){
+        var o = document.getElementById("myAudio");
+        var txt = "ended:" + o.ended +" loop:" + o.loop + " paused:" + o.paused + " volume" + o.volume + " autoplay" + o.autoplay;
+        var p = document.getElementById("audioattr");
+        p.innerHTML = txt;
+        o.play();
+    }
+</script>
+
+
+<!--<canvas id="myCanvas" width="800" height="800" style="border: solid 1px #6044ff;"></canvas>-->
+<!--<img id="imagelist" src="explore.png">-->
+<!--<script type="text/javascript">-->
+    <!--var c = document.getElementById("myCanvas");-->
+    <!--var ctx = c.getContext("2d");-->
+    <!--var img = document.getElementById("imagelist");-->
+    <!--var frameCount = 6;-->
+    <!--var frameWidth = 224;-->
+    <!--var frameHeight = 224;-->
+    <!--var currentFrame = 0;-->
+    <!--var tick = 0;-->
+
+    <!--function drawAnimation() {-->
+        <!--var sx = frameWidth * (currentFrame%5);-->
+        <!--var sy = frameHeight * ((currentFrame - currentFrame%5)/3);-->
+        <!--++tick;-->
+        <!--if (tick > 7) {-->
+            <!--tick = 0;-->
+            <!--currentFrame++;-->
+            <!--if (currentFrame >= frameCount) {-->
+                <!--currentFrame = 0;-->
+            <!--}-->
+        <!--}-->
+        <!--window.requestAnimationFrame(drawAnimation);-->
+        <!--ctx.clearRect(0,0,800,800);-->
+        <!--ctx.drawImage(img, sx, sy, frameWidth, frameHeight, 10, 10, frameWidth, frameHeight);-->
+    <!--}-->
+
+    <!--function onLoad() {-->
+        <!--window.requestAnimationFrame(drawAnimation);-->
+    <!--}-->
+<!--</script>-->
+
+</body>
+</html>

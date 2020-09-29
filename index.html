@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MyGame</title>
+</head>
+<body onload="onLoad();">
+<div id="resource" style="visibility: visible;">
+    <img id="player" src="plane.png" height="0px">
+    <img id="start" src="start.jpg" height="0px">
+    <img id="end" src="end.jpg" height="0px">
+    <img id="sky" src="sky.jpg" height="0px">
+    <img id="bullet" src="bullet.png" height="0px">
+    <img id="enemy" src="enemy.png" height="0px">
+    <img id="enemy01" src="enemy01.png" height="0px">
+    <img id="explore" src="explore.png" height="0px">
+    <img id="cloud" src="cloud.png" height="0px">
+    <audio id="bgm" src="bgm.mp3" loop="true"></audio>
+</div>
+<canvas id="cvs" width="800" height="800" style="border: solid 1px black"></canvas>
+<button id="startbtn" onclick="logic.changeState(1);" style="position: absolute;left: 300px;top: 700px; visibility: hidden;">
+    <h1>&nbsp;开始游戏&nbsp;</h1>
+</button>
+
+<button id="retrybtn" onclick="logic.changeState(0);" style="position: absolute;left: 300px;top: 700px; visibility: hidden;">
+    <h1>&nbsp;重新游戏&nbsp;</h1>
+</button>
+<h1 id = "level" style="position: absolute;left: 50px;top: 20px; visibility: hidden;">等级:1</h1>
+<h1 id = "score" style="position: absolute;left: 650px;top: 20px; visibility: hidden;">分数:100</h1>
+
+<h1 id = "maxscore" style="position: absolute;left: 300px;top: 200px; visibility: hidden;">最高分:100</h1>
+
+<script>
+    var ctx = null;
+    var logic = null;
+    var audio = null;
+    function onLoad() {
+        audio = new AudioManager();
+        var c=document.getElementById("cvs");
+        ctx=c.getContext("2d");
+        logic = new GameLogic();
+        logic.changeState(0);
+        logic.update();
+        document.onkeydown = showKeyDown;
+        document.onkeyup = showKeyUp;
+    }
+
+    function showKeyDown(ev){
+        var e = ev || window.event;
+//        console.log("Down key:" + e.keyCode
+//            + " ctl:" + e.ctrlKey
+//            + " alt:" + e.altKey
+//            + " shift:" + e.shiftKey);
+        if(e.keyCode == 37){
+            logic.player.moveLeft(true);
+        }
+        else if(e.keyCode == 39){
+            logic.player.moveRight(true);
+        }
+        else if(e.keyCode == 38){
+            logic.player.moveUp(true);
+        }
+        else if(e.keyCode == 40){
+            logic.player.moveDown(true);
+        }
+        else if(e.keyCode == 32){
+            logic.player.fire(true);
+        }
+    }
+    function showKeyUp(ev){
+        var e = ev || window.event;
+        if(e.keyCode == 37){
+            logic.player.moveLeft(false);
+        }
+        else if(e.keyCode == 39){
+            logic.player.moveRight(false);
+        }
+        else if(e.keyCode == 38){
+            logic.player.moveUp(false);
+        }
+        else if(e.keyCode == 40){
+            logic.player.moveDown(false);
+        }
+        else if(e.keyCode == 32){
+            logic.player.fire(false);
+        }
+    }
+
+    function AudioManager(){
+        var _this = this;
+        this.audios = [];
+        this.pool = [];
+        this.resource = document.getElementById("resource");
+        this.removeEnded = function () {
+            for(var i = _this.audios.length -1; i >= 0; --i){
+                var a = _this.audios[i];
+                if(a.ended){
+                    _this.audios.splice(i,1);
+                    _this.pool.push(a);
+                }
+            }
+        };
+        this.playMP3 = function (mp3,volume) {
+            _this.removeEnded();
+            // 使用pool
+            var dom = null;
+            for(var i = _this.pool.length - 1; i >=0; --i){
+                var p = _this.pool[i];
+                if(p.getAttribute("src") == mp3){
+                    _this.pool.splice(i,1);
+                    dom = p;
+                    break;
+                }
+            }
+            if(dom == null){
+                dom = document.createElement("audio");
+                dom.setAttribute("src",mp3);
+                _this.resource.appendChild(dom);
+            }
+            _this.audios.push(dom);
+            dom.play();
+            dom.setAttribute("volume",volume);
+            dom.volume = volume;
+        };
+        this.playBGM = function (play) {
+            var volume = 0.4;
+            var bgm = document.getElementById("bgm");
+            bgm.setAttribute("volume",volume);
+            bgm.volume = volume;
+            if(play){
+                bgm.play();
+            }
+            else{
+                bgm.pause();
+            }
+        }
+    }
+
+    function RenderObject(img,w,h,framecount,frametime) {
+        var _this = this;
+        this.img = img;
+        this.w = w;
+        this.h = h;
+        this.framecount = framecount;
+        this.frametime = frametime;
+        this.loop = true;
+
+        this.currentframe = 0;
+        this.tick = 0;
+        this.render = function (x,y,size) {
+            _this.tick++;
+            if(_this.tick >= _this.frametime){
+                _this.tick = 0;
+                _this.currentframe++;
+                if(_this.currentframe >= _this.framecount){
+                    if(_this.loop){
+                        _this.currentframe = 0;
+                    }
+                    else{
+                        _this.currentframe = _this.framecount;
+                    }
+
+                }
+            }
+            var sx = _this.currentframe * _this.w;
+            var sy = 0;
+            ctx.drawImage(_this.img,sx,sy,_this.w,_this.h,-size/2,- size/2,size,size)
+        }
+    }
+
+    function GameObject(logic,img,size,x,y,speed,w,h,framecount,frametime){
+        var _this = this;
+        this.gamelogic = logic;
+        this.id = logic.genNewID();
+        this.img = document.getElementById(img);
+        this.x = x;
+        this.y = y;
+        this.size = size;
+        this.speed = speed;
+        this.direction = 0;
+        this.visibility = true;
+
+        this.firestate = false;
+        this.CDTime = 10;
+        this.CDCurrent = 30;
+
+        this.maxhp = 100;
+        this.hp = 100;
+
+        this.renderobject = new RenderObject(this.img,w,h,framecount,frametime);
+
+        this.update = function () {
+            if(!_this.visibility){
+                return;
+            }
+            _this.x += _this.speed * Math.cos(_this.direction);
+            _this.y += _this.speed * Math.sin(_this.direction);
+            if(_this.x < 0 || _this.x > 800 || _this.y < 0 || _this.y > 800){
+                _this.visibility = false;
+            }
+        };
+
+        this.draw = function () {
+            if(_this.visibility){
+                ctx.save();
+                ctx.translate(_this.x,_this.y);
+                ctx.rotate(_this.direction + Math.PI/2);
+                _this.renderobject.render(_this.x,_this.y,_this.size);
+                ctx.restore();
+            }
+        };
+    }
+
+    function Effect(logic,img,size){
+        GameObject.call(this,logic,img,size,0,0,3,224,224,6,4);
+        audio.playMP3("boom.mp3",size/400);
+        this.renderobject.loop = false;
+        var _this = this;
+        this.update = function () {
+            if(_this.renderobject.currentframe == _this.renderobject.framecount ){
+                _this.visibility = false;
+            }
+        };
+    }
+    function Bullet(logic){
+        GameObject.call(this,logic,"bullet",50,0,0,12,100,100,1,6);
+        var _this = this;
+        this.damage = 30;
+        this.update = function () {
+            if(!_this.visibility){
+                return;
+            }
+            _this.x += _this.speed * Math.cos(_this.direction);
+            _this.y += _this.speed * Math.sin(_this.direction);
+            if(_this.x < 0 || _this.x > 800 || _this.y < 0 || _this.y > 800){
+                _this.visibility = false;
+            }
+            else{
+                for(var i = 0; i < _this.gamelogic.enemies.length; ++i){
+                    var enmy = _this.gamelogic.enemies[i];
+                    if(Math.abs(enmy.x - _this.x) < ((_this.size + enmy.size)/3)
+                        && Math.abs(enmy.y - _this.y) < ((_this.size + enmy.size)/3)
+                    ){
+                        enmy.makeDamage(_this.damage);
+                        var effect = new Effect(_this.gamelogic,"explore",_this.size*2);
+                        effect.x = _this.x;
+                        effect.y = _this.y;
+                        _this.gamelogic.addEffect(effect);
+                        _this.visibility = false;
+                        break;
+                    }
+                }
+            }
+        };
+    }
+
+    function BulletTrace(logic){
+        GameObject.call(this,logic,"bullet",50,0,0,12,100,100,1,6);
+        var _this = this;
+        this.target = 0;
+        this.damage = 30;
+        this.rotation = Math.PI/120;
+        this.draw = function () {
+            if(_this.visibility){
+                ctx.save();
+                ctx.translate(_this.x,_this.y);
+                ctx.rotate(_this.direction + Math.PI/2);
+                _this.renderobject.render(_this.x,_this.y,_this.size);
+                ctx.restore();
+            }
+        };
+        this.update = function () {
+            if(!_this.visibility){
+                return;
+            }
+            // 首先检查target是否存在
+            for(var i = 0; i < _this.gamelogic.enemies.length; ++i){
+                var enmy = _this.gamelogic.enemies[i];
+                if(enmy.id == _this.target){
+                    var dx = enmy.x - _this.x;
+                    var dy = enmy.y - _this.y;
+                    var alpha = Math.atan2(dy,dx);
+                    var da = alpha - _this.direction;
+                    da = da%(2*Math.PI);
+                    if(da < -Math.PI){
+                        da += Math.PI*2;
+                    }
+                    if(da > Math.PI){
+                        da -= Math.PI*2;
+                    }
+
+                    if(da > 0){
+                        if(da > _this.rotation){
+                            _this.direction +=_this.rotation;
+                        }
+                        else{
+                            _this.direction += da;
+                        }
+                    }
+                    else if(da < 0){
+                        if(da < -_this.rotation){
+                            _this.direction -=_this.rotation;
+                        }
+                        else{
+                            _this.direction -= da;
+                        }
+                    }
+                    break;
+                }
+            }
+            _this.x += _this.speed * Math.cos(_this.direction);
+            _this.y += _this.speed * Math.sin(_this.direction);
+            if(_this.x < 0 || _this.x > 800 || _this.y < 0 || _this.y > 800){
+                _this.visibility = false;
+            }
+            else{
+                for(var i = 0; i < _this.gamelogic.enemies.length; ++i){
+                    var enmy = _this.gamelogic.enemies[i];
+                    if(Math.abs(enmy.x - _this.x) < ((_this.size + enmy.size)/3)
+                        && Math.abs(enmy.y - _this.y) < ((_this.size + enmy.size)/3)
+                    ){
+                        enmy.makeDamage(_this.damage);
+                        var effect = new Effect(_this.gamelogic,"explore",_this.size*2);
+                        effect.x = _this.x;
+                        effect.y = _this.y;
+                        _this.gamelogic.addEffect(effect);
+                        _this.visibility = false;
+                        break;
+                    }
+                }
+            }
+        };
+    }
+    
+    function EnemyBullet(logic) {
+        GameObject.call(this,logic,"bullet",50,0,0,12,100,100,1,6);
+        var _this = this;
+        this.speed = 5;
+        this.damage = 20;
+        this.draw = function () {
+            if(_this.visibility){
+                ctx.save();
+                ctx.translate(_this.x,_this.y);
+                ctx.rotate(_this.direction + Math.PI/2);
+                _this.renderobject.render(_this.x,_this.y,_this.size);
+                ctx.restore();
+            }
+        };
+        this.update = function () {
+            if(!_this.visibility){
+                return;
+            }
+            _this.x += _this.speed * Math.cos(_this.direction);
+            _this.y += _this.speed * Math.sin(_this.direction);
+            if(_this.x < 0 || _this.x > 800 || _this.y < 0 || _this.y > 800){
+                _this.visibility = false;
+            }
+            else{
+                    var enmy = _this.gamelogic.player;
+                    if(Math.abs(enmy.x - _this.x) < ((_this.size + enmy.size)/3)
+                        && Math.abs(enmy.y - _this.y) < ((_this.size + enmy.size)/3)
+                    ){
+                        enmy.hp -= _this.damage;
+                        if(enmy.hp <= 0){
+                            enmy.visibility = false;
+                            var effect = new Effect(_this.gamelogic,"explore",enmy.size*1.5);
+                            effect.x = enmy.x;
+                            effect.y = enmy.y;
+                            _this.gamelogic.addEffect(effect);
+                            _this.gamelogic.changeState(2);
+                        }
+                        var effect = new Effect(_this.gamelogic,"explore",_this.size*2);
+                        effect.x = _this.x;
+                        effect.y = _this.y;
+                        _this.gamelogic.addEffect(effect);
+                        _this.visibility = false;
+                     }
+            }
+        };
+    }
+
+    function Enemy(logic,img,size){
+        GameObject.call(this,logic,img,size,0,0,3,256,256,2,6);
+        var _this = this;
+        this.firestate = true;
+        this.CDTime = 240;
+        this.score = 10;
+        this.makeDamage = function (damage) {
+            _this.hp -= damage;
+            if(_this.hp <= 0){
+                _this.visibility = false;
+                var effect = new Effect(_this.gamelogic,"explore",_this.size*1.5);
+                effect.x = _this.x;
+                effect.y = _this.y;
+                _this.gamelogic.addEffect(effect);
+                _this.gamelogic.changeScore(_this.score);
+            }
+        };
+        this.updateFire = function () {
+            _this.CDCurrent--;
+            if(_this.CDCurrent < 0){
+                _this.CDCurrent = 0;
+            }
+            if(_this.firestate){
+                if(_this.CDCurrent <= 0){
+                    var blt = new EnemyBullet(_this.gamelogic);
+                    blt.x = _this.x;
+                    blt.y = _this.y;
+                    var dx = _this.gamelogic.player.x - _this.x;
+                    var dy = _this.gamelogic.player.y - _this.y;
+                    var alpha = Math.atan2(dy,dx);
+                    blt.direction = alpha;
+                    // blt.direction = 90 * Math.PI/180;
+                    _this.gamelogic.addBullet(blt);
+                    _this.CDCurrent = _this.CDTime;
+                }
+            }
+        };
+        this.update = function () {
+            _this.x += _this.speed * Math.cos(_this.direction);
+            _this.y += _this.speed * Math.sin(_this.direction);
+            if(_this.x < 0 || _this.x > 800){
+                _this.direction = Math.PI - _this.direction;
+            }
+            if( _this.y < 0 || _this.y > 800){
+                _this.direction = - _this.direction;
+            }
+            _this.updateFire();
+
+        };
+
+        this.draw = function () {
+            if(_this.visibility){
+                ctx.save();
+                ctx.translate(_this.x,_this.y);
+                _this.renderobject.render(_this.x,_this.y,_this.size);
+                ctx.fillStyle="#50ff4b";
+                ctx.fillRect(-_this.size/2,-_this.size/2,_this.size * _this.hp /_this.maxhp,_this.size/15);
+                ctx.strokeRect(-_this.size/2,-_this.size/2,_this.size ,_this.size/15);
+                ctx.restore();
+            }
+        };
+     }
+
+    function EnemyType1(logic,img,size) {
+        Enemy.call(this,logic,img,size,0,0,3,256,256,2,6);
+        var _this = this;
+        this.maxhp = 60;
+        this.hp = 60;
+        this.score = 5;
+        this.update = function () {
+            _this.x += _this.speed * Math.cos(_this.direction);
+            _this.y += _this.speed * Math.sin(_this.direction);
+            if(_this.x < 0 || _this.x > 800){
+                _this.visibility = false;
+            }
+            if( _this.y < 0 || _this.y > 800){
+                _this.visibility = false;
+            }
+            var player = _this.gamelogic.player;
+            if(Math.abs(player.x - _this.x) < ((_this.size + player.size)/3)
+                && Math.abs(player.y - _this.y) < ((_this.size + player.size)/3)
+            ){
+                _this.gamelogic.changeState(2);
+            }
+            _this.updateFire();
+        };
+        this.updateFire = function () {
+            _this.CDCurrent--;
+            if(_this.CDCurrent < 0){
+                _this.CDCurrent = 0;
+            }
+            if(_this.firestate){
+                if(_this.CDCurrent <= 0){
+                    var count = 7;
+                    for(var i = 0; i < count; ++i){
+                        var blt = new EnemyBullet(_this.gamelogic);
+                        blt.damage = 5;
+                        blt.x = _this.x;
+                        blt.y = _this.y;
+                        blt.direction = 90 * Math.PI/180 + Math.PI * 2 * i /count;
+                        _this.gamelogic.addBullet(blt);
+                    }
+                    _this.CDCurrent = _this.CDTime;
+                }
+            }
+        };
+    }
+
+    function Player(logic) {
+        GameObject.call(this,logic,"player",100,400,700,5,256,256,2,6);
+        var _this = this;
+        this.moveleft = false;
+        this.moveright = false;
+        this.moveup = false;
+        this.movedown = false;
+        this.update = function () {
+            var move = false;
+            if(_this.moveleft != this.moveright){
+                move = true;
+                if(_this.moveleft){
+                    _this.direction = Math.PI;
+                }
+                else{
+                    _this.direction = 0;
+                }
+            }
+            if(_this.moveup != _this.movedown){
+                if(_this.moveup){
+                    if(move){
+                        if(_this.moveleft){
+                            _this.direction = -Math.PI * 3/4;
+                        }
+                        else{
+                            _this.direction = -Math.PI * 1/4;
+                        }
+                    }
+                    else{
+                        _this.direction = -Math.PI/2;
+                    }
+                }
+                else{
+                    if(move){
+                        if(_this.moveleft){
+                            _this.direction = Math.PI * 3/4;
+                        }
+                        else{
+                            _this.direction = Math.PI * 1/4;
+                        }
+                    }
+                    else{
+                        _this.direction = Math.PI/2;
+                    }
+                }
+                move = true;
+            }
+            if(move){
+                _this.x += _this.speed * Math.cos(_this.direction);
+                _this.y += _this.speed * Math.sin(_this.direction);
+                if(_this.x < 0 ){
+                    _this.x = 0;
+                }
+                else if(_this.x > 800){
+                    _this.x = 800;
+                }
+                if(_this.y < 0){
+                    _this.y = 0;
+                }
+                else if(_this.y > 800){
+                    _this.y = 800;
+                }
+            }
+            _this.CDCurrent--;
+            if(_this.CDCurrent < 0){
+                _this.CDCurrent = 0;
+            }
+            if(_this.firestate){
+                if(_this.CDCurrent <= 0){
+                    audio.playMP3("bullet.mp3",0.5);
+                    var blt = new Bullet(_this.gamelogic);
+                    blt.x = _this.x;
+                    blt.y = _this.y;
+                    blt.direction = (-90) * Math.PI/180;
+                    _this.gamelogic.addBullet(blt);
+                    _this.CDCurrent = _this.CDTime;
+//                    var target = null;
+//                    var dist = 800 * 800;
+//                    for(var i = 0; i < _this.gamelogic.enemies.length; ++i) {
+//                        var enmy = _this.gamelogic.enemies[i];
+//                        if(enmy.hp > 0){
+//                            var dx = enmy.x - _this.x;
+//                            var dy = enmy.y - _this.y;
+//                            var d = dx*dx + dy*dy;
+//                            if(d < dist){
+//                                target = enmy;
+//                                dist = d;
+//                            }
+//                        }
+//
+//                    }
+//                    if(target != null){
+//                        audio.playMP3("bullet.mp3",0.5);
+//                        var blt = new BulletTrace(_this.gamelogic);
+//                        blt.target = target.id;
+//                        blt.x = _this.x;
+//                        blt.y = _this.y;
+//                        blt.direction = (-90) * Math.PI / 180;
+//                        _this.gamelogic.addBullet(blt);
+//                        _this.CDCurrent = _this.CDTime;
+//                    }
+                }
+            }
+
+            this.draw = function () {
+                if(_this.visibility){
+                    ctx.save();
+                    ctx.translate(_this.x,_this.y);
+                    _this.renderobject.render(_this.x,_this.y,_this.size);
+                    ctx.fillStyle="#50ff4b";
+                    ctx.fillRect(-_this.size/2,-_this.size/2,_this.size * _this.hp /_this.maxhp,_this.size/15);
+                    ctx.strokeRect(-_this.size/2,-_this.size/2,_this.size ,_this.size/15);
+                    ctx.restore();
+                }
+            };
+        };
+        this.moveLeft = function (m) {
+            this.moveleft = m;
+        };
+        this.moveRight = function (m) {
+            this.moveright = m;
+        };
+        this.moveUp = function (m) {
+            this.moveup = m;
+        };
+        this.moveDown = function (m) {
+            this.movedown = m;
+        };
+        
+        this.fire = function (m) {
+            _this.firestate = m;
+        };
+    }
+    function GameLogic(){
+        var _this = this;
+        this.gamelogic = this;
+        this.idgen = 0;
+        this.genNewID = function () {
+            _this.idgen++;
+            return _this.idgen;
+        };
+        this.level = 0;
+        this.score = 0;
+        this.player = new Player(this);
+        this.bullets = [];
+        this.enemies = [];
+        this.effects = [];
+        this.objectbk = [];
+        this.objectfr = [];
+        this.img = document.getElementById("sky");
+        this.CDEnemy = 1*60;
+        this.CDEnemyCurrent = 0;
+        this.LimitEnemy = 5;
+        this.stages = [
+            {
+                "level":0,
+                "enemycd" : 120,
+                "enemylimit" : 1,
+                "score":100,
+                "playerhp":100,
+            },
+            {
+                "level":1,
+                "enemycd" : 90,
+                "enemylimit" : 3,
+                "score":200,
+                "playerhp":200,
+            },
+            {
+                "level":2,
+                "enemycd" : 60,
+                "enemylimit" : 5,
+                "score":500,
+                "playerhp":500,
+            },
+        ];
+
+        this.setNewLevel = function (newlevel) {
+            if(newlevel < this.stages.length){
+                if(newlevel > 0){
+                    audio.playMP3("levelup.mp3",1);
+                }
+                _this.level = newlevel;
+                this.CDEnemy = this.stages[newlevel].enemycd;
+                this.LimitEnemy = this.stages[newlevel].enemylimit;
+                var l = document.getElementById("level");
+                l.innerText = "等级:" + (_this.level + 1);
+                _this.player.maxhp = this.stages[newlevel].playerhp;
+                _this.player.hp = _this.player.maxhp;
+                var count = 18;
+                for(var i = 0; i < count; ++i){
+                    var blt = new Bullet(_this.gamelogic);
+                    blt.damage = 50;
+                    blt.x = _this.player.x;
+                    blt.y = _this.player.y;
+                    blt.direction = 90 * Math.PI/180 + Math.PI * 2 * i /count;
+                    _this.gamelogic.addBullet(blt);
+                }
+            }
+        };
+
+        this.changeScore = function (score) {
+            _this.score += score;
+            var s = document.getElementById("score");
+            s.innerText = "分数:" + _this.score;
+            if(_this.score >= this.stages[_this.level].score){
+                var newlevel = _this.level + 1;
+                _this.setNewLevel(newlevel);
+            }
+        };
+
+        this.addBullet = function (bullet) {
+            this.bullets.push(bullet);
+        };
+
+        this.addEffect = function (effect) {
+            this.effects.push(effect);
+        };
+
+        this.updateArray = function (arr) {
+            for(var i = 0; i < arr.length; ++i){
+                arr[i].update();
+            }
+            for(var i = arr.length - 1; i >= 0; --i){
+                if(!arr[i].visibility){
+                    arr.splice(i,1);
+                }
+            }
+        };
+
+        this.drawArray = function (arr) {
+            for(var i = 0; i < arr.length; ++i){
+                arr[i].draw();
+            }
+        };
+
+        // 状态
+        this.gamestate = -1; // 0:开始,1:游戏中,2:游戏结束
+        this.changeState = function (state) {
+            if(_this.gamestate != state){
+                if(_this.gamestate == 0){
+                    var btn = document.getElementById("startbtn");
+                    btn.style.visibility="hidden";
+                }
+                else if(_this.gamestate == 1){
+                    var s = document.getElementById("score");
+                    s.style.visibility="hidden";
+                    var l = document.getElementById("level");
+                    l.style.visibility="hidden";
+                    _this.player = new Player(this);
+                    _this.bullets = [];
+                    _this.enemies = [];
+                    _this.effects = [];
+                    _this.objectbk = [];
+                    _this.objectfr = [];
+                    audio.playBGM(false);
+                }
+                else if(_this.gamestate == 2){
+                    var btn = document.getElementById("retrybtn");
+                    btn.style.visibility="hidden";
+                    var s = document.getElementById("maxscore");
+                    s.style.visibility="hidden";
+                }
+                _this.gamestate = state;
+                if(state == 0){
+                    var btn = document.getElementById("startbtn");
+                    btn.style.visibility="visible";
+                    _this.img = document.getElementById("start");
+                }
+                else if(state == 1){
+                    _this.score = 0;
+                    _this.changeScore(0);
+                    var s = document.getElementById("score");
+                    s.style.visibility="visible";
+                    var l = document.getElementById("level");
+                    l.style.visibility="visible";
+                    _this.setNewLevel(0);
+                    _this.img = document.getElementById("sky");
+                    _this.bullets = [];
+                    _this.enemies = [];
+                    _this.effects = [];
+                    _this.objectbk = [];
+                    _this.objectfr = [];
+                    audio.playBGM(true);
+                }
+                else if(state == 2){
+                    var btn = document.getElementById("retrybtn");
+                    btn.style.visibility="visible";
+                    var s = document.getElementById("maxscore");
+                    s.innerText = "最高分:" + _this.score;
+                    s.style.visibility="visible";
+                    _this.img = document.getElementById("end");
+                }
+            }
+        };
+        this.update = function () {
+            switch (_this.gamestate){
+                case 0:{
+                    ctx.clearRect(0,0,800,800);
+                    ctx.drawImage(_this.img,0,0,800,800);
+                    break;
+                }
+                case 1:{
+                    _this.updateGame();
+                    break;
+                }
+                case 2:{
+                    ctx.clearRect(0,0,800,800);
+                    ctx.drawImage(_this.img,0,0,800,800);
+                    break;
+                }
+            }
+            window.requestAnimationFrame(_this.update);
+        };
+        _this.objectCD = 120;
+        _this.objectCurrentCD = 0;
+        this.updateObject = function () {
+            _this.objectCurrentCD--;if(_this.objectCurrentCD < 0) _this.objectCurrentCD = 0;
+            if(_this.objectCurrentCD <=0){
+                _this.objectCurrentCD = _this.objectCD;
+                var img = "cloud";
+                var size = 200  + Math.random() * 500;
+                // logic,img,size,x,y,speed,w,h,framecount,frametime
+                var obj = new GameObject(_this,img,size,0,0,1,256,256,1,60);
+                obj.direction = Math.PI * 1/2;
+                obj.x = 50 + Math.random() * 700;
+                obj.y = 100;
+                var r = Math.random();
+                if(r < 0.5){
+                    _this.objectbk.push(obj);
+                }
+                else{
+                    _this.objectfr.push(obj);
+                }
+            }
+        };
+
+        this.updateGame = function () {
+// update
+            _this.updateObject();
+            _this.CDEnemyCurrent--; if(_this.CDEnemyCurrent < 0){ _this.CDEnemyCurrent = 0};
+            if(_this.CDEnemyCurrent <= 0 && _this.enemies.length < _this.LimitEnemy){
+                _this.CDEnemyCurrent = _this.CDEnemy;
+                var r = Math.random();
+                var enmy = null;
+                var img = "enemy";
+                var size = 200;
+                var test = _this.level == 0 ? 0 : 0.5;
+                if(r < test){
+                    img = "enemy01";
+                    size = 150;
+                    document.get
+                    enmy = new EnemyType1(_this,img,size);
+                    enmy.direction = Math.random() * Math.PI * 1/2 + Math.PI/4;
+                    enmy.x = 200 + Math.random() * 400;
+                    enmy.y = 100;
+                }
+                else{
+                    enmy = new Enemy(_this,img,size);
+                    enmy.direction = Math.random() * Math.PI * 2;
+                    enmy.x = Math.random() * 800;
+                    enmy.y = Math.random() * 100;
+                }
+                _this.enemies.push(enmy);
+            }
+            _this.player.update();
+            _this.updateArray(_this.bullets);
+            _this.updateArray(_this.enemies);
+            _this.updateArray(_this.effects);
+            _this.updateArray(_this.objectbk);
+            _this.updateArray(_this.objectfr);
+// draw
+            ctx.clearRect(0,0,800,800);
+            ctx.drawImage(_this.img,0,0,800,800);
+            _this.drawArray(_this.objectbk);
+            _this.drawArray(_this.enemies);
+            _this.drawArray(_this.bullets);
+            _this.drawArray(_this.effects);
+            _this.player.draw();
+            _this.drawArray(_this.objectfr);
+        };
+    }
+</script>
+</body>
+</html>
